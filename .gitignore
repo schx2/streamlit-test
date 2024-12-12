@@ -32,7 +32,6 @@ ENV/
 *.swo
 
 # Data files
-*_matches.json
 *.csv
 *.xlsx
 
@@ -46,5 +45,7 @@ ENV/
 # OS
 .DS_Store
 Thumbs.db 
+
+# Large JSON files
 MD/MD_merged.json
 VA/VA_merged.json
