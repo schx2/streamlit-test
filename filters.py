@@ -15,7 +15,7 @@ def initialize_filter_state(force_reset=False):
         st.session_state.states = ['VA', 'MD']
         
     if 'year_built_range' not in st.session_state or force_reset:
-        st.session_state.year_built_range = (1800, 2023)
+        st.session_state.year_built_range = (1800, 2024)
         
     if 'beds_range' not in st.session_state or force_reset:
         st.session_state.beds_range = (0, 10)
@@ -27,7 +27,7 @@ def initialize_filter_state(force_reset=False):
         st.session_state.sqft_range = (0, 10000)
         
     if 'sale_date_range' not in st.session_state or force_reset:
-        st.session_state.sale_date_range = (1900, 2023)
+        st.session_state.sale_date_range = (1900, 2024)
         
     if 'sale_price_range' not in st.session_state or force_reset:
         st.session_state.sale_price_range = (0, 2000000)
@@ -79,7 +79,7 @@ def render_all_filters(builder):
     st.slider(
         "Year Built Range",
         min_value=1800,
-        max_value=2023,
+        max_value=2024,
         value=st.session_state.year_built_range,
         key="year_built_range"
     )
@@ -117,7 +117,7 @@ def render_all_filters(builder):
     st.slider(
         "Sale Year Range",
         min_value=1900,
-        max_value=2023,
+        max_value=2024,
         value=st.session_state.sale_date_range,
         key="sale_date_range"
     )
