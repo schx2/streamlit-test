@@ -46,3 +46,5 @@ ENV/
 # OS
 .DS_Store
 Thumbs.db 
+MD/MD_merged.json
+VA/VA_merged.json
