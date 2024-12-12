@@ -5,8 +5,8 @@ import json
 
 # Configuration constants
 OUTLIER_QUANTILES = {
-    'lower': 0.01,  # 5th percentile
-    'upper': 0.99   # 95th percentile
+    'lower': 0.00,  # 5th percentile
+    'upper': 1.00   # 95th percentile
 }
 
 # Default ranges
@@ -212,6 +212,7 @@ def build_property_filters():
     # Property types and states
     if st.session_state.property_types:
         filters['property_types'] = st.session_state.property_types
+        filters['include_null_property_type'] = st.session_state.include_null_property_type
     if st.session_state.states:
         filters['states'] = st.session_state.states
     
@@ -219,30 +220,37 @@ def build_property_filters():
     if st.session_state.year_built_range:
         filters['min_year_built'] = st.session_state.year_built_range[0]
         filters['max_year_built'] = st.session_state.year_built_range[1]
+        filters['include_null_year_built'] = st.session_state.include_null_year_built
     
     if st.session_state.beds_range:
         filters['min_beds'] = st.session_state.beds_range[0]
         filters['max_beds'] = st.session_state.beds_range[1]
+        filters['include_null_beds'] = st.session_state.include_null_beds
     
     if st.session_state.baths_range:
         filters['min_baths'] = st.session_state.baths_range[0]
         filters['max_baths'] = st.session_state.baths_range[1]
+        filters['include_null_baths'] = st.session_state.include_null_baths
     
     if st.session_state.sqft_range:
         filters['min_sqft'] = st.session_state.sqft_range[0]
         filters['max_sqft'] = st.session_state.sqft_range[1]
+        filters['include_null_sqft'] = st.session_state.include_null_sqft
     
     if st.session_state.sale_date_range:
         filters['min_sale_year'] = st.session_state.sale_date_range[0]
         filters['max_sale_year'] = st.session_state.sale_date_range[1]
+        filters['include_null_sale_date'] = st.session_state.include_null_sale_date
     
     if st.session_state.sale_price_range:
         filters['min_sale_price'] = st.session_state.sale_price_range[0]
         filters['max_sale_price'] = st.session_state.sale_price_range[1]
-    
+        filters['include_null_sale_price'] = st.session_state.include_null_sale_price
+
     if st.session_state.sale_to_permit_years_range:
         filters['min_sale_to_permit_years'] = st.session_state.sale_to_permit_years_range[0]
         filters['max_sale_to_permit_years'] = st.session_state.sale_to_permit_years_range[1]
+        filters['include_null_sale_to_permit'] = st.session_state.include_null_sale_to_permit
     
     return filters
 

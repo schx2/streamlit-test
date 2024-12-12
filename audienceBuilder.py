@@ -111,12 +111,17 @@ class AudienceBuilder:
             try:
                 # Year filters
                 if kwargs.get('min_year_built') is not None or kwargs.get('max_year_built') is not None:
-                    # Only include properties with non-null year built when filtering
-                    year_mask = self.properties_df['yearBuilt'].notna()
+                    year_mask = pd.Series(False, index=self.properties_df.index)
+                    # Include non-null values within range
+                    valid_years = self.properties_df['yearBuilt'].notna()
                     if kwargs.get('min_year_built') is not None:
-                        year_mask = year_mask & (self.properties_df['yearBuilt'] >= kwargs['min_year_built'])
+                        valid_years = valid_years & (self.properties_df['yearBuilt'] >= kwargs['min_year_built'])
                     if kwargs.get('max_year_built') is not None:
-                        year_mask = year_mask & (self.properties_df['yearBuilt'] <= kwargs['max_year_built'])
+                        valid_years = valid_years & (self.properties_df['yearBuilt'] <= kwargs['max_year_built'])
+                    year_mask = year_mask | valid_years
+                    # Include null values if specified
+                    if kwargs.get('include_null_year_built'):
+                        year_mask = year_mask | self.properties_df['yearBuilt'].isna()
                     mask = mask & year_mask
                     print(f"[Property Filtering] After year built filters: {mask.sum():,} properties")
             except Exception as e:
@@ -126,14 +131,18 @@ class AudienceBuilder:
             try:
                 # Sale year filters
                 if kwargs.get('min_sale_year') is not None or kwargs.get('max_sale_year') is not None:
-                    # Sale dates are already datetime objects with UTC timezone
                     sale_dates = self.properties_df['lastSaleDate']
-                    # Only include properties with non-null sale date when filtering
-                    sale_mask = sale_dates.notna()
+                    sale_mask = pd.Series(False, index=self.properties_df.index)
+                    # Include non-null values within range
+                    valid_sales = sale_dates.notna()
                     if kwargs.get('min_sale_year') is not None:
-                        sale_mask = sale_mask & (sale_dates.dt.year >= kwargs['min_sale_year'])
+                        valid_sales = valid_sales & (sale_dates.dt.year >= kwargs['min_sale_year'])
                     if kwargs.get('max_sale_year') is not None:
-                        sale_mask = sale_mask & (sale_dates.dt.year <= kwargs['max_sale_year'])
+                        valid_sales = valid_sales & (sale_dates.dt.year <= kwargs['max_sale_year'])
+                    sale_mask = sale_mask | valid_sales
+                    # Include null values if specified
+                    if kwargs.get('include_null_sale_date'):
+                        sale_mask = sale_mask | sale_dates.isna()
                     mask = mask & sale_mask
                     print(f"[Property Filtering] After sale year filters: {mask.sum():,} properties")
             except Exception as e:
@@ -143,12 +152,17 @@ class AudienceBuilder:
             try:
                 # Sale price filters
                 if kwargs.get('min_sale_price') is not None or kwargs.get('max_sale_price') is not None:
-                    # Only include properties with non-null sale price when filtering
-                    price_mask = self.properties_df['lastSalePrice'].notna()
+                    price_mask = pd.Series(False, index=self.properties_df.index)
+                    # Include non-null values within range
+                    valid_prices = self.properties_df['lastSalePrice'].notna()
                     if kwargs.get('min_sale_price') is not None:
-                        price_mask = price_mask & (self.properties_df['lastSalePrice'] >= kwargs['min_sale_price'])
+                        valid_prices = valid_prices & (self.properties_df['lastSalePrice'] >= kwargs['min_sale_price'])
                     if kwargs.get('max_sale_price') is not None:
-                        price_mask = price_mask & (self.properties_df['lastSalePrice'] <= kwargs['max_sale_price'])
+                        valid_prices = valid_prices & (self.properties_df['lastSalePrice'] <= kwargs['max_sale_price'])
+                    price_mask = price_mask | valid_prices
+                    # Include null values if specified
+                    if kwargs.get('include_null_sale_price'):
+                        price_mask = price_mask | self.properties_df['lastSalePrice'].isna()
                     mask = mask & price_mask
                     print(f"[Property Filtering] After sale price filters: {mask.sum():,} properties")
             except Exception as e:
@@ -158,20 +172,24 @@ class AudienceBuilder:
             try:
                 # Numeric filters
                 numeric_filters = [
-                    ('min_beds', 'max_beds', 'beds'),
-                    ('min_baths', 'max_baths', 'baths'),
-                    ('min_sqft', 'max_sqft', 'buildingSize')
+                    ('min_beds', 'max_beds', 'beds', 'include_null_beds'),
+                    ('min_baths', 'max_baths', 'baths', 'include_null_baths'),
+                    ('min_sqft', 'max_sqft', 'buildingSize', 'include_null_sqft')
                 ]
                 
-                for min_param, max_param, field in numeric_filters:
-                    if ((kwargs.get(min_param) is not None or kwargs.get(max_param) is not None) and 
-                        field in self.properties_df.columns):
-                        # Only include properties with non-null values when filtering
-                        num_mask = self.properties_df[field].notna()
+                for min_param, max_param, field, include_null_param in numeric_filters:
+                    if kwargs.get(min_param) is not None or kwargs.get(max_param) is not None:
+                        num_mask = pd.Series(False, index=self.properties_df.index)
+                        # Include non-null values within range
+                        valid_nums = self.properties_df[field].notna()
                         if kwargs.get(min_param) is not None:
-                            num_mask = num_mask & (self.properties_df[field] >= kwargs[min_param])
+                            valid_nums = valid_nums & (self.properties_df[field] >= kwargs[min_param])
                         if kwargs.get(max_param) is not None:
-                            num_mask = num_mask & (self.properties_df[field] <= kwargs[max_param])
+                            valid_nums = valid_nums & (self.properties_df[field] <= kwargs[max_param])
+                        num_mask = num_mask | valid_nums
+                        # Include null values if specified
+                        if kwargs.get(include_null_param):
+                            num_mask = num_mask | self.properties_df[field].isna()
                         mask = mask & num_mask
                         print(f"[Property Filtering] After {field} filters: {mask.sum():,} properties")
             except Exception as e:
@@ -181,12 +199,15 @@ class AudienceBuilder:
             try:
                 # List filters
                 if kwargs.get('property_types') is not None and len(kwargs['property_types']) > 0:
-                    # Only include properties with non-null and non-Unknown property types when filtering
-                    type_mask = (
-                        self.properties_df['propertyType'].notna() &
-                        (self.properties_df['propertyType'] != 'Unknown') &
-                        self.properties_df['propertyType'].isin(kwargs['property_types'])
-                    )
+                    type_mask = pd.Series(False, index=self.properties_df.index)
+                    # Include selected property types
+                    type_mask = type_mask | self.properties_df['propertyType'].isin(kwargs['property_types'])
+                    # Include null and unknown values if specified
+                    if kwargs.get('include_null_property_type'):
+                        type_mask = type_mask | (
+                            self.properties_df['propertyType'].isna() |
+                            (self.properties_df['propertyType'] == 'Unknown')
+                        )
                     mask = mask & type_mask
                     print(f"[Property Filtering] After property_types {kwargs['property_types']}: {mask.sum():,} properties")
             except Exception as e:
@@ -209,46 +230,50 @@ class AudienceBuilder:
                     
                     # Create a mask for properties with valid time differences
                     time_mask = pd.Series(False, index=self.properties_df.index)
-                    
-                    # Get properties with permits and valid sale dates
-                    valid_properties = set(self.property_permit_map.keys())
                     sale_dates = self.properties_df['lastSaleDate']
-                    properties_with_sales = set(sale_dates[sale_dates.notna()].index)
-                    valid_properties = valid_properties.intersection(properties_with_sales)
                     
-                    # Calculate time differences for each property
-                    for property_id in valid_properties:
-                        sale_date = self.properties_df.loc[property_id, 'lastSaleDate']
-                        property_valid = False
+                    # If we're including null values, start with all properties included
+                    if kwargs.get('include_null_sale_to_permit'):
+                        time_mask = pd.Series(True, index=self.properties_df.index)
+                    else:
+                        # Get properties with permits and valid sale dates
+                        valid_properties = set(self.property_permit_map.keys())
+                        properties_with_sales = set(sale_dates[sale_dates.notna()].index)
+                        valid_properties = valid_properties.intersection(properties_with_sales)
                         
-                        for permit_id in self.property_permit_map[property_id]:
-                            try:
-                                permit_date = self.permits_df.at[permit_id, 'file_date']
-                                if isinstance(permit_date, pd.Series):
-                                    print(f"Warning: Multiple permit dates found for permit {permit_id}")
+                        # Calculate time differences for each property
+                        for property_id in valid_properties:
+                            sale_date = self.properties_df.loc[property_id, 'lastSaleDate']
+                            property_valid = False
+                            
+                            for permit_id in self.property_permit_map[property_id]:
+                                try:
+                                    permit_date = self.permits_df.at[permit_id, 'file_date']
+                                    if isinstance(permit_date, pd.Series):
+                                        print(f"Warning: Multiple permit dates found for permit {permit_id}")
+                                        continue
+                                    
+                                    if pd.isna(permit_date):
+                                        continue
+                                    
+                                    time_diff = (permit_date - sale_date).days / 365.25
+                                    
+                                    # Check if time difference is within range
+                                    within_range = True
+                                    if kwargs.get('min_sale_to_permit_years') is not None:
+                                        within_range = within_range and (time_diff >= kwargs['min_sale_to_permit_years'])
+                                    if kwargs.get('max_sale_to_permit_years') is not None:
+                                        within_range = within_range and (time_diff <= kwargs['max_sale_to_permit_years'])
+                                    
+                                    if within_range:
+                                        property_valid = True
+                                        break
+                                except Exception as e:
+                                    print(f"Warning: Error processing permit {permit_id} for property {property_id}: {str(e)}")
                                     continue
-                                
-                                if pd.isna(permit_date):
-                                    continue
-                                
-                                time_diff = (permit_date - sale_date).days / 365.25
-                                
-                                # Check if time difference is within range
-                                within_range = True
-                                if kwargs.get('min_sale_to_permit_years') is not None:
-                                    within_range = within_range and (time_diff >= kwargs['min_sale_to_permit_years'])
-                                if kwargs.get('max_sale_to_permit_years') is not None:
-                                    within_range = within_range and (time_diff <= kwargs['max_sale_to_permit_years'])
-                                
-                                if within_range:
-                                    property_valid = True
-                                    break
-                            except Exception as e:
-                                print(f"Warning: Error processing permit {permit_id} for property {property_id}: {str(e)}")
-                                continue
-                        
-                        if property_valid:
-                            time_mask.loc[property_id] = True
+                            
+                            if property_valid:
+                                time_mask.loc[property_id] = True
                     
                     mask = mask & time_mask
                     print(f"[Property Filtering] After sale-to-permit time filter: {mask.sum():,} properties")
@@ -325,30 +350,10 @@ class AudienceBuilder:
         # Apply permit filters
         filtered_permits = self.filter_permits(**permit_filters)
         
-        # Create property-permit mappings
-        property_permit_map = {}
-        permit_property_map = {}
-        for state, file_path in self.matches_files.items():
-            with open(file_path, 'r') as f:
-                matches = json.load(f)
-                for match in matches:
-                    if 'property' in match and 'permit' in match:
-                        property_id = match['property'].get('id')
-                        permit_id = match['permit'].get('permit_id')
-                        if property_id and permit_id:
-                            if property_id not in property_permit_map:
-                                property_permit_map[property_id] = []
-                            property_permit_map[property_id].append(permit_id)
-                            permit_property_map[permit_id] = property_id
-        
-        # Add property_id to filtered permits
-        filtered_permits = filtered_permits.copy()
-        filtered_permits.loc[:, 'property_id'] = filtered_permits.index.map(lambda x: permit_property_map.get(x))
-        
-        # Get properties with matching permits
+        # Get properties with matching permits using existing mappings
         matching_property_ids = set()
         for permit_id in filtered_permits.index:
-            property_id = permit_property_map.get(permit_id)
+            property_id = self.permit_property_map.get(permit_id)
             if property_id:
                 matching_property_ids.add(property_id)
         
