@@ -6,22 +6,27 @@ from utils import (
     build_permit_filters,
     display_distributions
 )
-from filters import render_all_filters, initialize_filter_state
+from filters import render_all_filters, initialize_filter_state, reset_filters
 import json
 import os
 import pandas as pd
 import numpy as np
+
+st.set_page_config(page_title="Demo Audience Builder", page_icon="🏡", layout="wide")
 
 def save_audience(properties, name):
     """Save a set of properties as a named audience."""
     # Create audiences directory if it doesn't exist
     os.makedirs('audiences', exist_ok=True)
     
+    # Convert properties to a list of strings if they aren't already
+    properties_list = [str(p) for p in properties]
+    
     # Save the audience
     with open(f'audiences/{name}.json', 'w') as f:
         json.dump({
             'name': name,
-            'properties': properties
+            'properties': properties_list
         }, f)
 
 def load_saved_audiences():
@@ -32,6 +37,7 @@ def load_saved_audiences():
             if filename.endswith('.json'):
                 with open(f'audiences/{filename}', 'r') as f:
                     audience = json.load(f)
+                    # Convert properties back to the original type if needed
                     audiences[audience['name']] = set(audience['properties'])
     return audiences
 
@@ -43,6 +49,19 @@ def delete_audience(name):
         return True
     except Exception as e:
         print(f"Error deleting audience {name}: {str(e)}")
+        return False
+
+def delete_all_audiences():
+    """Delete all saved audience files and clear from session state."""
+    try:
+        if os.path.exists('audiences'):
+            for filename in os.listdir('audiences'):
+                if filename.endswith('.json'):
+                    os.remove(os.path.join('audiences', filename))
+        st.session_state.saved_audiences = {}
+        return True
+    except Exception as e:
+        print(f"Error deleting all audiences: {str(e)}")
         return False
 
 def get_audience_summary(properties_df, property_ids):
@@ -144,26 +163,7 @@ def display_audience_details(builder, properties, name=None, filtered_permits=No
     with col4:
         st.metric("Avg Beds/Baths", f"{summary['Average Beds']}/{summary['Average Baths']}")
     
-    # Property Types and States
-    col1, col2 = st.columns(2)
-    with col1:
-        st.subheader("Property Types")
-        type_data = pd.DataFrame(
-            [(k, v, f"{v/summary['Total Properties']*100:.1f}%") for k, v in summary['Property Types'].items()],
-            columns=["Type", "Count", "Percentage"]
-        )
-        st.dataframe(type_data, hide_index=True)
-    
-    with col2:
-        st.subheader("States")
-        state_data = pd.DataFrame(
-            [(k, v, f"{v/summary['Total Properties']*100:.1f}%") for k, v in summary['States'].items()],
-            columns=["State", "Count", "Percentage"]
-        )
-        st.dataframe(state_data, hide_index=True)
-    
     # Display distribution charts
-    st.subheader("Property Distributions")
     display_distributions(audience_results, builder, filtered_permits, key_prefix=key_prefix)
     
     # Display sample properties
@@ -186,6 +186,15 @@ def main():
         # Load saved audiences
         if 'saved_audiences' not in st.session_state:
             st.session_state.saved_audiences = load_saved_audiences()
+        
+        # Add delete all audiences button if there are any saved audiences
+        if st.session_state.saved_audiences:
+            if st.button("🗑️ Delete All Audiences"):
+                if delete_all_audiences():
+                    st.toast("All audiences have been deleted")
+                    st.rerun()
+                else:
+                    st.error("Failed to delete all audiences")
         
         # Create tabs for builder and saved audiences
         tabs = ["Audience Builder"]
@@ -212,7 +221,23 @@ def main():
         
         # Display content for current tab
         with current_tab[0]:  # Audience Builder tab
+            # Display metrics
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Total Available Properties", 
+                         f"{results['total_properties']:,}",
+                         f"-{len(excluded_properties):,} in saved audiences" if excluded_properties else None)
+            with col2:
+                st.metric("Properties Matching Filters", f"{results['matching_properties']:,}",
+                          help="Properties that have non-null values for all filters")
+            with col3:
+                st.metric("Permits Matching Filters", f"{results['matching_permits']:,}")
+            st.divider()
+
+
             # Add save audience button and name input
+            st.subheader("Create an audience")
+            st.write("Apply filters to create a new audience")
             audience_name = st.text_input("Audience Name", key="audience_name")
             if st.button("Save as Audience"):
                 if not audience_name:
@@ -220,37 +245,20 @@ def main():
                 elif audience_name in st.session_state.saved_audiences:
                     st.error("An audience with this name already exists")
                 else:
-                    # Get current results and save
-                    current_properties = set(results['results'].index.tolist())
-                    save_audience(list(current_properties), audience_name)
-                    st.session_state.saved_audiences[audience_name] = current_properties
-                    
-                    # Update excluded properties and rebuild results
-                    excluded_properties.update(current_properties)
-                    results = builder.build_audience(
-                        property_filters=build_property_filters(),
-                        permit_filters=build_permit_filters(),
-                        exclude_properties=list(excluded_properties)
-                    )
-                    
-                    st.success(f"Saved audience '{audience_name}' with {len(current_properties):,} properties")
-                    st.rerun()
-            
-            # Display metrics
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.metric("Total Available Properties", 
-                         f"{results['total_properties']:,}",
-                         f"-{len(excluded_properties):,} in saved audiences")
-            with col2:
-                st.metric("Properties Matching Filters", f"{results['matching_properties']:,}",
-                          help="Properties that have non-null values for all filters")
-            with col3:
-                st.metric("Permits Matching Filters", f"{results['matching_permits']:,}")
-            
-            st.metric("Final Matched Properties", f"{results['final_matches']:,}",
-                     help="Properties matching both property and permit filters")
-            
+                    try:
+                        # Get current results and save
+                        current_properties = results['results'].index.astype(str).tolist()
+                        save_audience(current_properties, audience_name)
+                        st.session_state.saved_audiences[audience_name] = set(current_properties)
+                        
+                        # Reset filters and clear audience name input
+                        reset_filters()
+                        
+                        st.toast(f"Audience '{audience_name}' created. Filters were reset.")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Failed to save audience: {str(e)}")
+
             # Display current selection details
             if len(results['results']) > 0:
                 display_audience_details(builder, results['results'].index, filtered_permits=results['filtered_permits'], key_prefix="main")

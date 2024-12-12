@@ -46,12 +46,12 @@ def load_data(matches_files):
     from audienceBuilder import AudienceBuilder
     
     if not st.session_state.initialized:
-        st.info("Loading data... please wait.")
+        # st.info("Loading data... please wait.")
         builder = AudienceBuilder(matches_files=matches_files)
         builder.load_data()
         st.session_state.builder = builder
         st.session_state.initialized = True
-        st.success("Data loaded successfully!")
+        # st.success("Data loaded successfully!")
     
     return st.session_state.builder
 
