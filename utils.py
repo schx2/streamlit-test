@@ -5,8 +5,8 @@ import json
 
 # Configuration constants
 OUTLIER_QUANTILES = {
-    'lower': 0.00,  # 5th percentile
-    'upper': 1.00   # 95th percentile
+    'lower': 0.01,  # 5th percentile
+    'upper': 0.99   # 95th percentile
 }
 
 # Default ranges
